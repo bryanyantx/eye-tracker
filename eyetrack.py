@@ -43,9 +43,9 @@ def detect_pupil(thresh_eye):
 def get_gaze_direction(cx, cy, w, h):
     """Determine gaze direction based on pupil position."""
     if cx < w // 3:
-        return "Looking Left"
-    elif cx > 2 * w // 3:
         return "Looking Right"
+    elif cx > 2 * w // 3:
+        return "Looking Left"
     else:
         return "Looking Center"
 

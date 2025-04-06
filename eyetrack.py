@@ -1,6 +1,46 @@
 import cv2
 import dlib
 import numpy as np
+from pynput.mouse import Button, Controller 
+
+from enum import Enum
+
+class mouse_action(Enum):
+    moveUp = 1
+    moveDown = 2
+    moveLeft = 3
+    moveRight = 4
+    rightClickDown = 5
+    leftClickDown = 6
+    rightClickUp = 7
+    leftClickUp = 8
+
+
+mouse = Controller()
+
+scale = 10
+
+def move_mouse(action):
+    if(action == mouse_action.moveUp):
+        mouse.move(0, scale)
+    elif(action == mouse_action.moveDown):
+        mouse.move(0, -scale)
+    elif(action == mouse_action.moveRight):
+        mouse.move(scale, 0)
+    elif(action == mouse_action.moveDown):
+        mouse.move(-scale, 0)
+
+def mouse_click(action):
+    if(action == mouse_action.leftClickDown):
+        mouse.press(Button.left) 
+    elif(action == mouse_action.rightClickDown):
+        mouse.press(Button.right) 
+    elif(action == mouse_action.leftClickUp):
+        mouse.release(Button.left) 
+    elif(action == mouse_action.rightClickUp):
+        mouse.release(Button.right) 
+    
+
 
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")

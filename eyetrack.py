@@ -1,8 +1,8 @@
 import cv2
 import dlib
 import numpy as np
+import numpy.typing as npt
 from pynput.mouse import Button, Controller
-
 from enum import Enum
 
 
@@ -19,32 +19,36 @@ class mouse_action(Enum):
 
 mouse = Controller()
 
-scale = 10
+SCALE = 10
 
 
-def move_mouse(action):
-    if (action == mouse_action.moveUp):
-        mouse.move(0, scale)
-    elif (action == mouse_action.moveDown):
-        mouse.move(0, -scale)
-    elif (action == mouse_action.moveRight):
-        mouse.move(scale, 0)
-    elif (action == mouse_action.moveDown):
-        mouse.move(-scale, 0)
-
-
-def mouse_click(action):
-    if (action == mouse_action.leftClickDown):
-        mouse.press(Button.left)
-    elif (action == mouse_action.rightClickDown):
-        mouse.press(Button.right)
-    elif (action == mouse_action.leftClickUp):
-        mouse.release(Button.left)
-    elif (action == mouse_action.rightClickUp):
-        mouse.release(Button.right)
-
-
-def get_eye_landmarks(landmarks, left=True):
+def move_mouse(action: mouse_action) -> None:
+    match action:
+        case mouse_action.moveUp:
+            mouse.move(0, SCALE)
+        case mouse_action.moveDown:
+            mouse.move(0, -SCALE)
+        case mouse_action.moveRight:
+            mouse.move(SCALE, 0)
+        case mouse_action.moveLeft:
+            mouse.move(-SCALE, 0)
+        case _:
+            pass
+         
+def mouse_click(action: mouse_action) -> None:
+    match action:
+        case mouse_action.rightClickDown:
+            mouse.press(Button.right)
+        case mouse_action.leftClickDown:
+            mouse.press(Button.left)
+        case mouse_action.rightClickUp:
+            mouse.release(Button.right)
+        case mouse_action.leftClickUp:
+            mouse.release(Button.left)
+        case _:
+            pass
+    
+def get_eye_landmarks(landmarks: dlib.full_object_detection, left: bool=True) -> list[dlib.point]:
     """Extracts eye landmarks for left or right eye."""
     if left:
         return [landmarks.part(i) for i in range(36, 42)]
@@ -52,7 +56,7 @@ def get_eye_landmarks(landmarks, left=True):
         return [landmarks.part(i) for i in range(42, 48)]
 
 
-def eye_region(frame, landmarks, left=True):
+def eye_region(frame: npt.NDArray, landmarks: dlib.full_object_detection, left: bool=True) -> tuple[npt.NDArray, npt.NDArray, int, int]:
     """Extract the eye region and return a thresholded version."""
     points = get_eye_landmarks(landmarks, left)
     eye_points = np.array([(p.x, p.y) for p in points], np.int32)
@@ -68,7 +72,7 @@ def eye_region(frame, landmarks, left=True):
     return threshold_eye, eye_points, x, y
 
 
-def detect_pupil(thresh_eye):
+def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int]:
     """Detects pupil using contours and returns the center coordinates."""
     contours, _ = cv2.findContours(
         thresh_eye, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -76,22 +80,22 @@ def detect_pupil(thresh_eye):
 
     for contour in contours:
         (x, y, w, h) = cv2.boundingRect(contour)
-        cx, cy = x + w // 2, y + h // 2
-        return cx, cy
+        return x + w // 2, y + h // 2
     return None, None
 
 
-def get_gaze_direction(cx, cy, w, h):
+def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
     """Determine gaze direction based on pupil position."""
-    if cx < w // 3:
+    if cx < shape[0] // 3:
         return "Looking Right"
-    elif cx > 2 * w // 3:
+    elif cx > 2 * shape[1] // 3:
         return "Looking Left"
     else:
         return "Looking Center"
 
 
-def draw_pupil(frame, thresh_eye, cx, cy, x, y, is_left):
+def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[int, int], x: int, y: int, left=True):
+    cx, cy = pupil_position
     if cx is None:
         return
     if cy is None:
@@ -101,14 +105,13 @@ def draw_pupil(frame, thresh_eye, cx, cy, x, y, is_left):
     cv2.circle(frame, (x + cx, y + cy), 3, (0, 255, 0), -1)
 
     # Get gaze direction
-    direction = get_gaze_direction(
-        cx, cy, thresh_eye.shape[1], thresh_eye.shape[0])
-    eye_side = "Left Eye" if is_left else "Right Eye"
+    direction = get_gaze_direction(cx, cy, shape)
+    eye_side = "Left Eye" if left else "Right Eye"
     cv2.putText(frame, f"{eye_side}: {direction}", (x, y - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
 
-def main():
+def main() -> None:
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 
@@ -129,11 +132,11 @@ def main():
 
             # Process both eyes
             for is_left in [True, False]:
-                thresh_eye, eye_points, x, y = eye_region(
+                thresh_eye, _, x, y = eye_region(
                     frame, landmarks, is_left)
-                cx, cy = detect_pupil(thresh_eye)
+                pupil_position = detect_pupil(thresh_eye)
 
-                draw_pupil(frame, thresh_eye, cx, cy, x, y, is_left)
+                draw_pupil(frame, thresh_eye.shape, pupil_position, x, y, is_left)
 
         cv2.imshow("Gaze Detection", frame)
 

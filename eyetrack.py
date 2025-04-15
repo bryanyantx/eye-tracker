@@ -125,11 +125,14 @@ def eye_aspect_ratio(eye: np.ndarray) -> float:
     return (a + b) / (2.0 * c)
 
 def click_mouse(ear_left: float, ear_right: float) -> None:
+    global MOUSE_LEFT_DOWN, MOUSE_RIGHT_DOWN, COUNTER_LEFT, COUNTER_RIGHT
+
     if ear_left < EAR_THRESHOLD:
         COUNTER_LEFT += 1
     else:
         if COUNTER_LEFT >= CLICK_THRESHOLD:
             mouse_click(mouse_action.leftClickUp if MOUSE_LEFT_DOWN else mouse_action.leftClickDown)
+            MOUSE_LEFT_DOWN = not MOUSE_LEFT_DOWN
         COUNTER_LEFT = 0
 
     if ear_right < EAR_THRESHOLD:
@@ -137,6 +140,7 @@ def click_mouse(ear_left: float, ear_right: float) -> None:
     else:
         if COUNTER_RIGHT >= CLICK_THRESHOLD:
             mouse_click(mouse_action.rightClickUp if MOUSE_RIGHT_DOWN else mouse_action.rightClickDown)
+            MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
         COUNTER_RIGHT = 0
 
 def main() -> None:
@@ -160,7 +164,6 @@ def main() -> None:
             left_eye = get_eye_landmarks(landmarks, True)
             right_eye = get_eye_landmarks(landmarks, False)
             ear_left, ear_right = eye_aspect_ratio(left_eye), eye_aspect_ratio(right_eye)
-            ear = (ear_left + ear_right) / 2
             draw_pupils(frame, landmarks)
             click_mouse(ear_left, ear_right)
             

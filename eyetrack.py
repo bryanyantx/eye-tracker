@@ -86,10 +86,21 @@ def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int]:
 
 def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
     """Determine gaze direction based on pupil position."""
-    if cx < shape[0] // 3:
+    #print( cx, cy, shape)
+    if cx < shape[1] // 3:
+        print("looking right")
         return "Looking Right"
     elif cx > 2 * shape[1] // 3:
+        print("looking left")
         return "Looking Left"
+    elif shape[0] > 15 & cy > 9:
+        print("looking up")
+        return "Looking Center"
+        
+    elif  (shape[0] < 14) & (cy < 5):
+        print("looking down")
+        return "Looking Center"
+        
     else:
         return "Looking Center"
 

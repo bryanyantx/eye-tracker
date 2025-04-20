@@ -16,7 +16,12 @@ class mouse_action(Enum):
     rightClickUp = 7
     leftClickUp = 8
 
-
+class mouse_direction(Enum):
+    up = 1
+    right = 2
+    down = 3
+    left = 4
+    center = 5
 
 mouse = Controller()
 
@@ -100,32 +105,25 @@ def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int]:
 
     return None, None, None
 
-def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
+def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> mouse_direction:
     """Classify gaze direction based on pupil location in the box."""
     # Horizontal
-    if cx < shape[1] // 3:
-        horizontal = "Right"
-    elif cx > 2 * shape[1] // 3:
-        horizontal = "Left"
+    if cx * 3 < shape[1]:
+        horizontal = mouse_direction.right 
+    elif cx * 3 > (shape[1] << 1):
+        horizontal = mouse_direction.left
     else:
-        horizontal = "Center"
+        horizontal = mouse_direction.center
 
     # Vertical (tune as needed)
     if cy < shape[0] * 0.33:
-        vertical = "Up"
+        vertical = mouse_direction.up
     elif cy > shape[0] * 0.465:
-        vertical = "Down"
+        vertical = mouse_direction.down
     else:
-        vertical = "Center"
+        vertical = mouse_direction.center
 
-
-    if vertical == "Center":
-        temp = horizontal
-    else:
-        temp = vertical
-
-
-    return temp
+    return horizontal if vertical == mouse_direction.center else vertical
 
 def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection):  
     for is_left in [True, False]:
@@ -147,19 +145,21 @@ def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[
 
     # Get gaze direction
     direction = get_gaze_direction(cx, cy, shape)
-
-    if(direction == "Left"):
-        print("looking left")
-        move_mouse(mouse_action.moveLeft)
-    elif (direction == "Right"):
-        print("looking right")
-        move_mouse(mouse_action.moveRight)
-    elif (direction == "Up"):
+    
+    if (direction == mouse_direction.up):
         print("looking up")
         move_mouse(mouse_action.moveUp)
-    elif (direction == "Down"):
+    elif (direction == mouse_direction.down):
         print("looking down")
         move_mouse(mouse_action.moveDown)
+    elif (direction == mouse_direction.right):
+        print("looking right")
+        move_mouse(mouse_action.moveRight)
+    elif (direction == mouse_direction.left):
+        print("looking left")
+        move_mouse(mouse_action.moveLeft)
+    else:
+        print("looking center")
 
     eye_side = "Left Eye" if left else "Right Eye"
     cv2.putText(frame, f"{eye_side}: {direction}", (x, y - 10),

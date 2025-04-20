@@ -20,14 +20,19 @@ class mouse_action(Enum):
 mouse = Controller()
 
 SCALE = 10
-
+MOUSE_LEFT_DOWN = False
+MOUSE_RIGHT_DOWN = False
+COUNTER_LEFT = 0
+COUNTER_RIGHT = 0
+CLICK_THRESHOLD = 10
+EAR_THRESHOLD = 0.15
 
 def move_mouse(action: mouse_action) -> None:
     match action:
         case mouse_action.moveUp:
-            mouse.move(0, SCALE)
-        case mouse_action.moveDown:
             mouse.move(0, -SCALE)
+        case mouse_action.moveDown:
+            mouse.move(0, SCALE)
         case mouse_action.moveRight:
             mouse.move(SCALE, 0)
         case mouse_action.moveLeft:
@@ -48,13 +53,10 @@ def mouse_click(action: mouse_action) -> None:
         case _:
             pass
     
-def get_eye_landmarks(landmarks: dlib.full_object_detection, left: bool=True) -> list[dlib.point]:
+def get_eye_landmarks(landmarks: dlib.full_object_detection, left: bool=True) -> np.ndarray:
     """Extracts eye landmarks for left or right eye."""
-    if left:
-        return [landmarks.part(i) for i in range(36, 42)]
-    else:
-        return [landmarks.part(i) for i in range(42, 48)]
-
+    points = [landmarks.part(i) for i in range(36, 42)] if left else [landmarks.part(i) for i in range(42, 48)]
+    return np.array([(p.x, p.y) for p in points], np.int32)
 
 def eye_region(frame: npt.NDArray, landmarks: dlib.full_object_detection, left: bool=True) -> tuple[npt.NDArray, npt.NDArray, int, int]:
     """Extract a fixed-size eye region and return threshold image and position."""
@@ -119,6 +121,13 @@ def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
 
     return f"{horizontal} {vertical}"
 
+def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection):  
+    for is_left in [True, False]:
+        thresh_eye, _, x, y = eye_region(frame, landmarks, is_left)
+        pupil_position = detect_pupil(thresh_eye)
+
+        draw_pupil(frame, thresh_eye.shape, pupil_position, x, y, is_left)
+
 
 def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[int, int], x: int, y: int, left=True):
     cx, cy, _ = pupil_position
@@ -132,10 +141,50 @@ def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[
 
     # Get gaze direction
     direction = get_gaze_direction(cx, cy, shape)
+
+    if(direction == "Looking Left"):
+        print("looking left")
+        move_mouse(mouse_action.moveLeft)
+    elif (direction == "Looking Right"):
+        print("looking right")
+        move_mouse(mouse_action.moveRight)
+    elif (direction == "Looking Up"):
+        print("looking up")
+        move_mouse(mouse_action.moveUp)
+    elif (direction == "Looking Down"):
+        print("looking down")
+        move_mouse(mouse_action.moveDown)
+
     eye_side = "Left Eye" if left else "Right Eye"
     cv2.putText(frame, f"{eye_side}: {direction}", (x, y - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
+def eye_aspect_ratio(eye: np.ndarray) -> float:
+    a = np.linalg.norm(eye[1] - eye[5])
+    b = np.linalg.norm(eye[2] - eye[4])
+    c = np.linalg.norm(eye[0] - eye[3])
+    return (a + b) / (2.0 * c)
+
+def click_mouse(ear_left: float, ear_right: float) -> None:
+    global MOUSE_LEFT_DOWN, MOUSE_RIGHT_DOWN, COUNTER_LEFT, COUNTER_RIGHT
+
+    if ear_left < EAR_THRESHOLD:
+        COUNTER_LEFT += 1
+    else:
+        if COUNTER_LEFT >= CLICK_THRESHOLD:
+            # mouse_click(mouse_action.leftClickUp if MOUSE_LEFT_DOWN else mouse_action.leftClickDown)
+            print("left click")
+            MOUSE_LEFT_DOWN = not MOUSE_LEFT_DOWN
+        COUNTER_LEFT = 0
+
+    if ear_right < EAR_THRESHOLD:
+        COUNTER_RIGHT += 1
+    else:
+        if COUNTER_RIGHT >= CLICK_THRESHOLD:
+            # mouse_click(mouse_action.rightClickUp if MOUSE_RIGHT_DOWN else mouse_action.rightClickDown)
+            print("right click")
+            MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
+        COUNTER_RIGHT = 0
 
 def main() -> None:
     detector = dlib.get_frontal_face_detector()
@@ -155,15 +204,14 @@ def main() -> None:
 
         for face in faces:
             landmarks = predictor(gray, face)
+            left_eye = get_eye_landmarks(landmarks, True)
+            right_eye = get_eye_landmarks(landmarks, False)
 
-            # Process both eyes
-            for is_left in [True, False]:
-                thresh_eye, _, x, y = eye_region(
-                    frame, landmarks, is_left)
-                pupil_position = detect_pupil(thresh_eye)
-
-                draw_pupil(frame, thresh_eye.shape, pupil_position, x, y, is_left)
-
+            # Camera is mirrored so switch left and right
+            ear_right, ear_left = eye_aspect_ratio(left_eye), eye_aspect_ratio(right_eye)
+            draw_pupils(frame, landmarks)
+            click_mouse(ear_left, ear_right)
+            
         cv2.imshow("Gaze Detection", frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):

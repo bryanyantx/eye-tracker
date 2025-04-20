@@ -57,56 +57,71 @@ def get_eye_landmarks(landmarks: dlib.full_object_detection, left: bool=True) ->
 
 
 def eye_region(frame: npt.NDArray, landmarks: dlib.full_object_detection, left: bool=True) -> tuple[npt.NDArray, npt.NDArray, int, int]:
-    """Extract the eye region and return a thresholded version."""
+    """Extract a fixed-size eye region and return threshold image and position."""
     points = get_eye_landmarks(landmarks, left)
     eye_points = np.array([(p.x, p.y) for p in points], np.int32)
 
-    # Get bounding rectangle around eye
-    x, y, w, h = cv2.boundingRect(eye_points)
-    eye = frame[y:y+h, x:x+w]
+    # Center of eye
+    center_x = int(np.mean(eye_points[:, 0]))
+    center_y = int(np.mean(eye_points[:, 1]))
 
-    # Apply grayscale and thresholding
+    # Fixed box size (can tweak for your face/camera)
+    box_w, box_h = 60, 40
+    x = center_x - box_w // 2
+    y = center_y - box_h // 2
+
+    # Clamp to frame size
+    x = max(x, 0)
+    y = max(y, 0)
+    eye = frame[y:y+box_h, x:x+box_w]
+
     gray_eye = cv2.cvtColor(eye, cv2.COLOR_BGR2GRAY)
-    _, threshold_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY_INV)
+    _, thresh_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY_INV)
 
-    return threshold_eye, eye_points, x, y
+    return thresh_eye, eye_points, x, y
 
 
 def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int]:
-    """Detects pupil using contours and returns the center coordinates."""
-    contours, _ = cv2.findContours(
-        thresh_eye, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    """Detects pupil contour and center coordinates."""
+    contours, _ = cv2.findContours(thresh_eye, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
 
     for contour in contours:
-        (x, y, w, h) = cv2.boundingRect(contour)
-        return x + w // 2, y + h // 2
-    return None, None
+        if cv2.contourArea(contour) < 100:
+            continue
 
+        M = cv2.moments(contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            return cx, cy, contour
+
+    return None, None, None
 
 def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
-    """Determine gaze direction based on pupil position."""
-    #print( cx, cy, shape)
+    """Classify gaze direction based on pupil location in the box."""
+    # Horizontal
     if cx < shape[1] // 3:
-        print("looking right")
-        return "Looking Right"
+        horizontal = "Left"
     elif cx > 2 * shape[1] // 3:
-        print("looking left")
-        return "Looking Left"
-    elif shape[0] > 15 & cy > 9:
-        print("looking up")
-        return "Looking Center"
-        
-    elif  (shape[0] < 14) & (cy < 5):
-        print("looking down")
-        return "Looking Center"
-        
+        horizontal = "Right"
     else:
-        return "Looking Center"
+        horizontal = "Center"
+
+    # Vertical (tune as needed)
+    if cy < shape[0] * 0.33:
+        vertical = "Up"
+    elif cy > shape[0] * 0.465:
+        vertical = "Down"
+    else:
+        vertical = "Center"
+
+
+    return f"{horizontal} {vertical}"
 
 
 def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[int, int], x: int, y: int, left=True):
-    cx, cy = pupil_position
+    cx, cy, _ = pupil_position
     if cx is None:
         return
     if cy is None:

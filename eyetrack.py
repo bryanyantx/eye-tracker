@@ -60,8 +60,7 @@ def get_eye_landmarks(landmarks: dlib.full_object_detection, left: bool=True) ->
 
 def eye_region(frame: npt.NDArray, landmarks: dlib.full_object_detection, left: bool=True) -> tuple[npt.NDArray, npt.NDArray, int, int]:
     """Extract a fixed-size eye region and return threshold image and position."""
-    points = get_eye_landmarks(landmarks, left)
-    eye_points = np.array([(p.x, p.y) for p in points], np.int32)
+    eye_points = get_eye_landmarks(landmarks, left)
 
     # Center of eye
     center_x = int(np.mean(eye_points[:, 0]))

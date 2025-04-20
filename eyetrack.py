@@ -30,9 +30,9 @@ EAR_THRESHOLD = 0.15
 def move_mouse(action: mouse_action) -> None:
     match action:
         case mouse_action.moveUp:
-            mouse.move(0, SCALE)
-        case mouse_action.moveDown:
             mouse.move(0, -SCALE)
+        case mouse_action.moveDown:
+            mouse.move(0, SCALE)
         case mouse_action.moveRight:
             mouse.move(SCALE, 0)
         case mouse_action.moveLeft:
@@ -87,10 +87,14 @@ def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int]:
 
 def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
     """Determine gaze direction based on pupil position."""
-    if cx < shape[0] // 3:
+    if cx < shape[1] // 3:
         return "Looking Right"
     elif cx > 2 * shape[1] // 3:
         return "Looking Left"
+    elif shape[0] > 15 & cy > 9:
+        return "Looking Up"
+    elif  (shape[0] < 14) & (cy < 5):
+        return "Looking Down"
     else:
         return "Looking Center"
 
@@ -114,6 +118,20 @@ def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[
 
     # Get gaze direction
     direction = get_gaze_direction(cx, cy, shape)
+
+    if(direction == "Looking Left"):
+        print("looking left")
+        move_mouse(mouse_action.moveLeft)
+    elif (direction == "Looking Right"):
+        print("looking right")
+        move_mouse(mouse_action.moveRight)
+    elif (direction == "Looking Up"):
+        print("looking up")
+        move_mouse(mouse_action.moveUp)
+    elif (direction == "Looking Down"):
+        print("looking down")
+        move_mouse(mouse_action.moveDown)
+
     eye_side = "Left Eye" if left else "Right Eye"
     cv2.putText(frame, f"{eye_side}: {direction}", (x, y - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)

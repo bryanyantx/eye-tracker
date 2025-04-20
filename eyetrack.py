@@ -131,7 +131,8 @@ def click_mouse(ear_left: float, ear_right: float) -> None:
         COUNTER_LEFT += 1
     else:
         if COUNTER_LEFT >= CLICK_THRESHOLD:
-            mouse_click(mouse_action.leftClickUp if MOUSE_LEFT_DOWN else mouse_action.leftClickDown)
+            # mouse_click(mouse_action.leftClickUp if MOUSE_LEFT_DOWN else mouse_action.leftClickDown)
+            print("left click")
             MOUSE_LEFT_DOWN = not MOUSE_LEFT_DOWN
         COUNTER_LEFT = 0
 
@@ -139,7 +140,8 @@ def click_mouse(ear_left: float, ear_right: float) -> None:
         COUNTER_RIGHT += 1
     else:
         if COUNTER_RIGHT >= CLICK_THRESHOLD:
-            mouse_click(mouse_action.rightClickUp if MOUSE_RIGHT_DOWN else mouse_action.rightClickDown)
+            # mouse_click(mouse_action.rightClickUp if MOUSE_RIGHT_DOWN else mouse_action.rightClickDown)
+            print("right click")
             MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
         COUNTER_RIGHT = 0
 
@@ -163,7 +165,9 @@ def main() -> None:
             landmarks = predictor(gray, face)
             left_eye = get_eye_landmarks(landmarks, True)
             right_eye = get_eye_landmarks(landmarks, False)
-            ear_left, ear_right = eye_aspect_ratio(left_eye), eye_aspect_ratio(right_eye)
+
+            # Camera is mirrored so switch left and right
+            ear_right, ear_left = eye_aspect_ratio(left_eye), eye_aspect_ratio(right_eye)
             draw_pupils(frame, landmarks)
             click_mouse(ear_left, ear_right)
             

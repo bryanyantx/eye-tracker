@@ -17,6 +17,7 @@ class mouse_action(Enum):
     leftClickUp = 8
 
 
+
 mouse = Controller()
 
 SCALE = 10
@@ -103,9 +104,9 @@ def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
     """Classify gaze direction based on pupil location in the box."""
     # Horizontal
     if cx < shape[1] // 3:
-        horizontal = "Left"
-    elif cx > 2 * shape[1] // 3:
         horizontal = "Right"
+    elif cx > 2 * shape[1] // 3:
+        horizontal = "Left"
     else:
         horizontal = "Center"
 
@@ -118,7 +119,13 @@ def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> str:
         vertical = "Center"
 
 
-    return f"{horizontal} {vertical}"
+    if vertical == "Center":
+        temp = horizontal
+    else:
+        temp = vertical
+
+
+    return temp
 
 def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection):  
     for is_left in [True, False]:
@@ -141,16 +148,16 @@ def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[
     # Get gaze direction
     direction = get_gaze_direction(cx, cy, shape)
 
-    if(direction == "Looking Left"):
+    if(direction == "Left"):
         print("looking left")
         move_mouse(mouse_action.moveLeft)
-    elif (direction == "Looking Right"):
+    elif (direction == "Right"):
         print("looking right")
         move_mouse(mouse_action.moveRight)
-    elif (direction == "Looking Up"):
+    elif (direction == "Up"):
         print("looking up")
         move_mouse(mouse_action.moveUp)
-    elif (direction == "Looking Down"):
+    elif (direction == "Down"):
         print("looking down")
         move_mouse(mouse_action.moveDown)
 

@@ -7,79 +7,134 @@ from enum import Enum
 
 
 class mouse_action(Enum):
-    moveUp = 1
-    moveDown = 2
-    moveLeft = 3
-    moveRight = 4
-    rightClickDown = 5
-    leftClickDown = 6
-    rightClickUp = 7
-    leftClickUp = 8
+    MOVE_UP = 1
+    MOVE_DOWN = 2
+    MOVE_LEFT = 3
+    MOVE_RIGHT = 4
+    RIGHT_CLICK_DOWN = 5
+    LEFT_CLICK_DOWN = 6
+    RIGHT_CLICK_UP = 7
+    LEFT_CLICK_UP = 8
 
 class mouse_direction(Enum):
-    up = 1
-    right = 2
-    down = 3
-    left = 4
-    center = 5
+    UP = 1
+    RIGHT = 2
+    DOWN = 3
+    LEFT = 4
+    CENTER = 5
 
-mouse = Controller()
 
+# Constants
 SCALE = 10
+CLICK_THRESHOLD = 10
+EAR_THRESHOLD = 0.15
+UP_SCALAR = 0.25
+DOWN_SCALAR = 0.45
+
+# Mouse state
+mouse = Controller()
 MOUSE_LEFT_DOWN = False
 MOUSE_RIGHT_DOWN = False
 COUNTER_LEFT = 0
 COUNTER_RIGHT = 0
-CLICK_THRESHOLD = 10
-EAR_THRESHOLD = 0.15
 
 def move_mouse(action: mouse_action) -> None:
+    """
+    Move the mouse cursor according to the given action.
+
+    This function moves the mouse cursor relative to its current position by the
+    given scale. The scale is a constant defined as 10 pixels.
+
+    Args:
+        action: The action to perform on the mouse. This can be one of the
+            following values:
+                - mouse_action.MOVE_UP
+                - mouse_action.MOVE_DOWN
+                - mouse_action.MOVE_RIGHT
+                - mouse_action.MOVE_LEFT
+    """
     match action:
-        case mouse_action.moveUp:
+        case mouse_action.MOVE_UP:
             mouse.move(0, -SCALE)
-        case mouse_action.moveDown:
+        case mouse_action.MOVE_DOWN:
             mouse.move(0, SCALE)
-        case mouse_action.moveRight:
+        case mouse_action.MOVE_RIGHT:
             mouse.move(SCALE, 0)
-        case mouse_action.moveLeft:
+        case mouse_action.MOVE_LEFT:
             mouse.move(-SCALE, 0)
-        case _:
-            pass
          
 def mouse_click(action: mouse_action) -> None:
+    """
+    Simulate mouse click actions based on the specified action.
+
+    This function simulates mouse click actions by pressing or releasing the mouse
+    buttons. It supports both left and right mouse button actions.
+
+    Args:
+        action: The action to perform on the mouse. This can be one of the
+            following values:
+                - mouse_action.RIGHT_CLICK_DOWN: Press the right mouse button.
+                - mouse_action.LEFT_CLICK_DOWN: Press the left mouse button.
+                - mouse_action.RIGHT_CLICK_UP: Release the right mouse button.
+                - mouse_action.LEFT_CLICK_UP: Release the left mouse button.
+
+    Returns:
+        None
+    """
+
     match action:
-        case mouse_action.rightClickDown:
+        case mouse_action.RIGHT_CLICK_DOWN:
             mouse.press(Button.right)
-        case mouse_action.leftClickDown:
+        case mouse_action.LEFT_CLICK_DOWN:
             mouse.press(Button.left)
-        case mouse_action.rightClickUp:
+        case mouse_action.RIGHT_CLICK_UP:
             mouse.release(Button.right)
-        case mouse_action.leftClickUp:
+        case mouse_action.LEFT_CLICK_UP:
             mouse.release(Button.left)
-        case _:
-            pass
     
 def get_eye_landmarks(landmarks: dlib.full_object_detection, left: bool=True) -> np.ndarray:
-    """Extracts eye landmarks for left or right eye."""
+    """
+    Extracts the landmarks for either the left or right eye from the given 68-landmark dlib shape.
+
+    Args:
+        landmarks: The dlib shape from which to extract the eye landmarks.
+        left: Whether to extract the left eye (True) or right eye (False). Defaults to True.
+
+    Returns:
+        A numpy array of shape (6, 2) containing the x, y coordinates of the 6 eye landmarks.
+    """
     points = [landmarks.part(i) for i in range(36, 42)] if left else [landmarks.part(i) for i in range(42, 48)]
     return np.array([(p.x, p.y) for p in points], np.int32)
 
 def eye_region(frame: npt.NDArray, landmarks: dlib.full_object_detection, left: bool=True) -> tuple[npt.NDArray, npt.NDArray, int, int]:
-    """Extract a fixed-size eye region and return threshold image and position."""
+    """
+    Extracts the region of interest (ROI) for the specified eye from the given frame and 68-landmark dlib shape.
+
+    The ROI is a box centered on the eye which is then used to detect the eye gaze. The returned values are:
+        - thresh_eye: The thresholded image of the eye ROI, used to detect the pupil.
+        - eye_points: The 6-landmark coordinates of the eye, used to detect the eye aspect ratio.
+        - x, y: The coordinates of the top-left corner of the eye ROI in the original frame.
+
+    Args:
+        frame: The input frame from which to extract the eye ROI.
+        landmarks: The dlib shape from which to extract the eye landmarks.
+        left: Whether to extract the left eye (True) or right eye (False). Defaults to True.
+
+    Returns:
+        A tuple of (thresh_eye, eye_points, x, y) as described above.
+    """
+    
     eye_points = get_eye_landmarks(landmarks, left)
 
     # Center of eye
-    center_x = int(np.mean(eye_points[:, 0]))
-    center_y = int(np.mean(eye_points[:, 1]))
+    center_x = np.mean(eye_points[:, 0]).astype(int)
+    center_y = np.mean(eye_points[:, 1]).astype(int)
 
     # Fixed box size (can tweak for your face/camera)
     box_w, box_h = 60, 40
-    x = center_x - box_w // 2
-    y = center_y - box_h // 2
+    x = max(center_x - (box_w >> 1), 0)
+    y = max(center_y - (box_h >> 1), 0)
 
-    # Clamp to frame size
-    x = max(x, 0)
-    y = max(y, 0)
     eye = frame[y:y+box_h, x:x+box_w]
 
     gray_eye = cv2.cvtColor(eye, cv2.COLOR_BGR2GRAY)
@@ -88,8 +143,19 @@ def eye_region(frame: npt.NDArray, landmarks: dlib.full_object_detection, left: 
     return thresh_eye, eye_points, x, y
 
 
-def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int]:
-    """Detects pupil contour and center coordinates."""
+def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int, int]:
+    """
+    Detects the pupil in a given thresholded eye image.
+
+    The function iterates through the contours in the image and selects the largest contour that is larger than a certain size (100 pixels).
+    The function then calculates the center of mass of the contour and returns the x and y coordinates of the center of mass and the contour itself.
+
+    Args:
+        thresh_eye: A thresholded image of the eye, used to detect the pupil.
+
+    Returns:
+        A tuple of (cx, cy, contour), where cx and cy are the coordinates of the center of mass of the pupil and contour is the contour of the pupil.
+    """
     contours, _ = cv2.findContours(thresh_eye, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
 
@@ -106,26 +172,66 @@ def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int]:
     return None, None, None
 
 def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> mouse_direction:
-    """Classify gaze direction based on pupil location in the box."""
+    """
+    Determines the direction of the gaze based on the pupil location.
+
+    The function takes the x and y coordinates of the pupil center and the shape of the frame as input.
+    It returns the direction of the gaze as a mouse_direction enum.
+
+    The direction is determined as follows:
+        - Horizontal: If the pupil is on the left third of the frame, the direction is LEFT.
+                      If the pupil is on the right third of the frame, the direction is RIGHT.
+                      Otherwise, the direction is CENTER.
+        - Vertical:   If the pupil is on the top quarter of the frame, the direction is UP.
+                      If the pupil is on the bottom half of the frame, the direction is DOWN.
+                      Otherwise, the direction is CENTER.
+
+    If the horizontal direction is CENTER, the function returns the vertical direction.
+    Otherwise, it returns the horizontal direction.
+
+    Args:
+        cx: The x coordinate of the pupil center.
+        cy: The y coordinate of the pupil center.
+        shape: The shape of the frame as a tuple (height, width).
+
+    Returns:
+        A mouse_direction enum representing the direction of the gaze.
+    """
+    width, height = shape[1], shape[0]
+    
     # Horizontal
-    if cx * 3 < shape[1]:
-        horizontal = mouse_direction.right 
-    elif cx * 3 > (shape[1] << 1):
-        horizontal = mouse_direction.left
-    else:
-        horizontal = mouse_direction.center
+    horizontal = (
+        mouse_direction.RIGHT if cx * 3 < width else
+        mouse_direction.LEFT if cx * 3 > (width << 1) else
+        mouse_direction.CENTER
+    )
 
     # Vertical (tune as needed)
-    if cy < shape[0] * 0.25:
-        vertical = mouse_direction.up
-    elif cy > shape[0] * 0.45:
-        vertical = mouse_direction.down
-    else:
-        vertical = mouse_direction.center
+    vertical = (
+        mouse_direction.UP if cy < height * UP_SCALAR else
+        mouse_direction.DOWN if cy > height * DOWN_SCALAR else
+        mouse_direction.CENTER
+    )
 
-    return vertical if horizontal == mouse_direction.center else horizontal
 
-def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection):  
+    return vertical if horizontal == mouse_direction.CENTER else horizontal
+
+def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection) -> None:  
+    """
+    Draws the detected pupils on the given frame.
+
+    This function processes both the left and right eyes to locate and draw the pupils.
+    It extracts the eye region, detects the pupil within the thresholded image, and then
+    calls the draw_pupil function to render the pupil on the frame.
+
+    Args:
+        frame: The input frame on which to draw the pupils.
+        landmarks: The dlib shape containing facial landmarks for the frame.
+
+    Returns:
+        None
+    """
+
     for is_left in [True, False]:
         thresh_eye, _, x, y = eye_region(frame, landmarks, is_left)
         pupil_position = detect_pupil(thresh_eye)
@@ -133,7 +239,27 @@ def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection):
         draw_pupil(frame, thresh_eye.shape, pupil_position, x, y, is_left)
 
 
-def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[int, int], x: int, y: int, left=True):
+def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[int, int, int], x: int, y: int, left=True)-> None:
+    """
+    Draws the detected pupil on the given frame and moves the mouse cursor accordingly.
+
+    This function takes the given frame, the shape of the eye region, the detected pupil position,
+    and the x, y coordinates of the top-left corner of the eye region in the original frame.
+    It then draws a circle at the pupil position and determines the gaze direction based on the
+    pupil position. Finally, it moves the mouse cursor according to the gaze direction and prints
+    the gaze direction to the console.
+
+    Args:
+        frame: The input frame on which to draw the pupil.
+        shape: The shape of the eye region.
+        pupil_position: The detected pupil position.
+        x: The x coordinate of the top-left corner of the eye region in the original frame.
+        y: The y coordinate of the top-left corner of the eye region in the original frame.
+        left: Whether the eye is the left eye (True) or right eye (False). Defaults to True.
+
+    Returns:
+        None
+    """
     cx, cy, _ = pupil_position
     if cx is None:
         return
@@ -145,24 +271,24 @@ def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[
 
     # Get gaze direction
     direction = get_gaze_direction(cx, cy, shape)
-    
-    if (direction == mouse_direction.up):
-        print("looking up")
-        move_mouse(mouse_action.moveUp)
-    elif (direction == mouse_direction.down):
-        print("looking down")
-        move_mouse(mouse_action.moveDown)
-    elif (direction == mouse_direction.right):
-        print("looking right")
-        move_mouse(mouse_action.moveRight)
-    elif (direction == mouse_direction.left):
-        print("looking left")
-        move_mouse(mouse_action.moveLeft)
-    else:
-        print("looking center")
+    match direction:
+        case mouse_direction.UP:
+            print("↑")
+            move_mouse(mouse_action.MOVE_UP)
+        case mouse_direction.DOWN:
+            print("↓")
+            move_mouse(mouse_action.MOVE_DOWN)
+        case mouse_direction.RIGHT:
+            print("→")
+            move_mouse(mouse_action.MOVE_RIGHT)
+        case mouse_direction.LEFT:
+            print("←")
+            move_mouse(mouse_action.MOVE_LEFT)
+        case mouse_direction.CENTER:
+            print("👁️👁️")
 
     eye_side = "Left Eye" if left else "Right Eye"
-    cv2.putText(frame, f"{eye_side}: {direction}", (x, y - 10),
+    cv2.putText(frame, f"{eye_side}: {direction.name}", (x, y - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
 def eye_aspect_ratio(eye: np.ndarray) -> float:
@@ -172,6 +298,17 @@ def eye_aspect_ratio(eye: np.ndarray) -> float:
     return (a + b) / (2.0 * c)
 
 def click_mouse(ear_left: float, ear_right: float) -> None:
+    """
+    Simulates a mouse click action based on the given EAR values.
+
+    The function takes two EAR values, one for the left eye and one for the right eye.
+    If the EAR value for either eye is below the threshold, it increments the corresponding counter.
+    If the counter exceeds the click threshold, it simulates a mouse click action and resets the counter.
+
+    Args:
+        ear_left: The EAR value for the left eye.
+        ear_right: The EAR value for the right eye.
+    """
     global MOUSE_LEFT_DOWN, MOUSE_RIGHT_DOWN, COUNTER_LEFT, COUNTER_RIGHT
 
     if ear_left < EAR_THRESHOLD:
@@ -193,6 +330,21 @@ def click_mouse(ear_left: float, ear_right: float) -> None:
         COUNTER_RIGHT = 0
 
 def main() -> None:
+    """
+    Main function to perform real-time eye tracking and mouse control.
+
+    This function captures video from the default camera, detects faces and 
+    facial landmarks in each frame, and tracks eye movement to control the 
+    mouse cursor. It utilizes dlib's frontal face detector and shape predictor 
+    to obtain facial landmarks. The eye aspect ratio (EAR) is calculated for 
+    both eyes to detect blinks and simulate mouse click actions. It draws 
+    pupil positions on the frame and controls the mouse based on gaze 
+    direction. The video feed displays in a window until 'q' is pressed.
+
+    Returns:
+        None
+    """
+
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 

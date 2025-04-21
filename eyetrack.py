@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 from pynput.mouse import Button, Controller
 from enum import Enum
-
+import json
 
 class mouse_action(Enum):
     MOVE_UP = 1
@@ -25,11 +25,11 @@ class mouse_direction(Enum):
 
 
 # Constants
-SCALE = 10
-CLICK_THRESHOLD = 10
-EAR_THRESHOLD = 0.15
-UP_SCALAR = 0.25
-DOWN_SCALAR = 0.45
+SCALE = 0 
+CLICK_THRESHOLD = 0
+EAR_THRESHOLD = 0
+UP_SCALAR = 0
+DOWN_SCALAR = 0
 
 # Mouse state
 mouse = Controller()
@@ -328,6 +328,18 @@ def click_mouse(ear_left: float, ear_right: float) -> None:
             print("right click")
             MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
         COUNTER_RIGHT = 0
+
+def load_config() -> None:
+    global SCALE, CLICK_THRESHOLD, EAR_THRESHOLD, UP_SCALAR, DOWN_SCALAR
+    with open("config.json", "r") as f:
+        config = json.load(f)
+        
+    SCALE = config["scale"]
+    CLICK_THRESHOLD = config["click_threshold"]
+    EAR_THRESHOLD = config["ear_threshold"]
+    UP_SCALAR = config["up_scalar"]
+    DOWN_SCALAR = config["down_scalar"]
+
 
 def main() -> None:
     """

@@ -116,14 +116,14 @@ def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> mouse_direct
         horizontal = mouse_direction.center
 
     # Vertical (tune as needed)
-    if cy < shape[0] * 0.33:
+    if cy < shape[0] * 0.25:
         vertical = mouse_direction.up
-    elif cy > shape[0] * 0.465:
+    elif cy > shape[0] * 0.45:
         vertical = mouse_direction.down
     else:
         vertical = mouse_direction.center
 
-    return horizontal if vertical == mouse_direction.center else vertical
+    return vertical if horizontal == mouse_direction.center else horizontal
 
 def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection):  
     for is_left in [True, False]:

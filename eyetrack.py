@@ -334,11 +334,11 @@ def load_config() -> None:
     with open("config.json", "r") as f:
         config = json.load(f)
         
-    SCALE = config["scale"]
-    CLICK_THRESHOLD = config["click_threshold"]
-    EAR_THRESHOLD = config["ear_threshold"]
-    UP_SCALAR = config["up_scalar"]
-    DOWN_SCALAR = config["down_scalar"]
+    SCALE = config["SCALE"]
+    CLICK_THRESHOLD = config["CLICK_THRESHOLD"]
+    EAR_THRESHOLD = config["EAR_THRESHOLD"]
+    UP_SCALAR = config["UP_SCALAR"]
+    DOWN_SCALAR = config["DOWN_SCALAR"]
 
 
 def main() -> None:

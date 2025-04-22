@@ -38,7 +38,7 @@ MOUSE_RIGHT_DOWN = False
 COUNTER_LEFT = 0
 COUNTER_RIGHT = 0
 
-def move_mouse(action: mouse_action) -> None:
+def mouse_move(action: mouse_action) -> None:
     """
     Move the mouse cursor according to the given action.
 
@@ -62,7 +62,26 @@ def move_mouse(action: mouse_action) -> None:
             mouse.move(SCALE, 0)
         case mouse_action.MOVE_LEFT:
             mouse.move(-SCALE, 0)
-         
+
+def move_mouse(left_direction: mouse_direction, right_direction: mouse_direction) -> None:
+    if left_direction == mouse_direction.CENTER or right_direction == mouse_direction.CENTER:
+        print("👁️👁️")
+        return
+    
+    if left_direction == mouse_direction.UP or right_direction == mouse_direction.UP:
+        print("👆👆")
+        mouse_move(mouse_action.MOVE_UP)
+    elif left_direction == mouse_direction.RIGHT or right_direction == mouse_direction.RIGHT:
+        print("👉👉")
+        mouse_move(mouse_action.MOVE_RIGHT)
+    elif left_direction == mouse_direction.DOWN or right_direction == mouse_direction.DOWN:
+        print("👇👇")
+        mouse_move(mouse_action.MOVE_DOWN)
+    elif left_direction == mouse_direction.LEFT or right_direction == mouse_direction.LEFT:
+        print("👈👈")
+        mouse_move(mouse_action.MOVE_LEFT)
+        
+        
 def mouse_click(action: mouse_action) -> None:
     """
     Simulate mouse click actions based on the specified action.
@@ -91,6 +110,38 @@ def mouse_click(action: mouse_action) -> None:
             mouse.release(Button.right)
         case mouse_action.LEFT_CLICK_UP:
             mouse.release(Button.left)
+
+def click_mouse(ear_left: float, ear_right: float) -> None:
+    """
+    Simulates a mouse click action based on the given EAR values.
+
+    The function takes two EAR values, one for the left eye and one for the right eye.
+    If the EAR value for either eye is below the threshold, it increments the corresponding counter.
+    If the counter exceeds the click threshold, it simulates a mouse click action and resets the counter.
+
+    Args:
+        ear_left: The EAR value for the left eye.
+        ear_right: The EAR value for the right eye.
+    """
+    global MOUSE_LEFT_DOWN, MOUSE_RIGHT_DOWN, COUNTER_LEFT, COUNTER_RIGHT
+
+    if ear_left < EAR_THRESHOLD:
+        COUNTER_LEFT += 1
+    else:
+        if COUNTER_LEFT >= CLICK_THRESHOLD:
+            # mouse_click(mouse_action.leftClickUp if MOUSE_LEFT_DOWN else mouse_action.leftClickDown)
+            print("left click")
+            MOUSE_LEFT_DOWN = not MOUSE_LEFT_DOWN
+        COUNTER_LEFT = 0
+
+    if ear_right < EAR_THRESHOLD:
+        COUNTER_RIGHT += 1
+    else:
+        if COUNTER_RIGHT >= CLICK_THRESHOLD:
+            # mouse_click(mouse_action.rightClickUp if MOUSE_RIGHT_DOWN else mouse_action.rightClickDown)
+            print("right click")
+            MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
+        COUNTER_RIGHT = 0
     
 def get_eye_landmarks(landmarks: dlib.full_object_detection, left: bool=True) -> np.ndarray:
     """
@@ -202,7 +253,7 @@ def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> mouse_direct
     # Horizontal
     horizontal = (
         mouse_direction.RIGHT if cx * 3 < width else
-        mouse_direction.LEFT if cx * 3 > (width << 1) else
+        mouse_direction.LEFT if (cx * 3) >> 1 > width else
         mouse_direction.CENTER
     )
 
@@ -213,8 +264,39 @@ def get_gaze_direction(cx: int, cy: int, shape: tuple[int, int]) -> mouse_direct
         mouse_direction.CENTER
     )
 
-
     return vertical if horizontal == mouse_direction.CENTER else horizontal
+
+def get_pupil_position(frame: np.ndarray, landmarks: dlib.full_object_detection) -> dict[str, dict[str, int | tuple[int, int, int] | tuple[int, int]]]:
+    result = {
+        "left": {
+            "x": None,
+            "y": None,
+            "shape": None,
+            "position": None
+        },
+        "right": {
+            "x": None,
+            "y": None,
+            "shape": None,
+            "position": None
+        },
+    }
+    
+    for is_left in [True, False]:
+        thresh_eye, _, x, y = eye_region(frame, landmarks, is_left)
+        if is_left:
+            result["left"]["x"] = x
+            result["left"]["y"] = y
+            result["left"]["shape"] = thresh_eye.shape
+            result["left"]["position"] = detect_pupil(thresh_eye)
+        else:
+            result["right"]["x"] = x
+            result["right"]["y"] = y
+            result["right"]["shape"] = thresh_eye.shape
+            result["right"]["position"] = detect_pupil(thresh_eye)
+
+    return result
+        
 
 def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection) -> None:  
     """
@@ -239,7 +321,7 @@ def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection) -> Non
         draw_pupil(frame, thresh_eye.shape, pupil_position, x, y, is_left)
 
 
-def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[int, int, int], x: int, y: int, left=True)-> None:
+def draw_pupil(frame: np.ndarray, direction: mouse_direction, pupil_position: tuple[int, int, int], x: int, y: int, left=True)-> None:
     """
     Draws the detected pupil on the given frame and moves the mouse cursor accordingly.
 
@@ -268,25 +350,7 @@ def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[
 
     # Draw pupil location
     cv2.circle(frame, (x + cx, y + cy), 3, (0, 255, 0), -1)
-
-    # Get gaze direction
-    direction = get_gaze_direction(cx, cy, shape)
-    match direction:
-        case mouse_direction.UP:
-            print("↑")
-            move_mouse(mouse_action.MOVE_UP)
-        case mouse_direction.DOWN:
-            print("↓")
-            move_mouse(mouse_action.MOVE_DOWN)
-        case mouse_direction.RIGHT:
-            print("→")
-            move_mouse(mouse_action.MOVE_RIGHT)
-        case mouse_direction.LEFT:
-            print("←")
-            move_mouse(mouse_action.MOVE_LEFT)
-        case mouse_direction.CENTER:
-            print("👁️👁️")
-
+    
     eye_side = "Left Eye" if left else "Right Eye"
     cv2.putText(frame, f"{eye_side}: {direction.name}", (x, y - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
@@ -297,37 +361,7 @@ def eye_aspect_ratio(eye: np.ndarray) -> float:
     c = np.linalg.norm(eye[0] - eye[3])
     return (a + b) / (2.0 * c)
 
-def click_mouse(ear_left: float, ear_right: float) -> None:
-    """
-    Simulates a mouse click action based on the given EAR values.
 
-    The function takes two EAR values, one for the left eye and one for the right eye.
-    If the EAR value for either eye is below the threshold, it increments the corresponding counter.
-    If the counter exceeds the click threshold, it simulates a mouse click action and resets the counter.
-
-    Args:
-        ear_left: The EAR value for the left eye.
-        ear_right: The EAR value for the right eye.
-    """
-    global MOUSE_LEFT_DOWN, MOUSE_RIGHT_DOWN, COUNTER_LEFT, COUNTER_RIGHT
-
-    if ear_left < EAR_THRESHOLD:
-        COUNTER_LEFT += 1
-    else:
-        if COUNTER_LEFT >= CLICK_THRESHOLD:
-            # mouse_click(mouse_action.leftClickUp if MOUSE_LEFT_DOWN else mouse_action.leftClickDown)
-            print("left click")
-            MOUSE_LEFT_DOWN = not MOUSE_LEFT_DOWN
-        COUNTER_LEFT = 0
-
-    if ear_right < EAR_THRESHOLD:
-        COUNTER_RIGHT += 1
-    else:
-        if COUNTER_RIGHT >= CLICK_THRESHOLD:
-            # mouse_click(mouse_action.rightClickUp if MOUSE_RIGHT_DOWN else mouse_action.rightClickDown)
-            print("right click")
-            MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
-        COUNTER_RIGHT = 0
 
 def load_config() -> None:
     global SCALE, CLICK_THRESHOLD, EAR_THRESHOLD, UP_SCALAR, DOWN_SCALAR
@@ -380,7 +414,14 @@ def main() -> None:
 
             # Camera is mirrored so switch left and right
             ear_right, ear_left = eye_aspect_ratio(left_eye), eye_aspect_ratio(right_eye)
-            draw_pupils(frame, landmarks)
+            result = get_pupil_position(frame, landmarks)
+            left_direction = get_gaze_direction(result["left"]["x"], result["left"]["y"], result["left"]["shape"])
+            right_direction = get_gaze_direction(result["right"]["x"], result["right"]["y"], result["right"]["shape"])
+             
+            draw_pupil(frame, left_direction, result["left"]["position"], result["left"]["x"], result["left"]["y"], True)
+            draw_pupil(frame, right_direction, result["right"]["position"], result["right"]["x"], result["right"]["y"], False)
+            
+            move_mouse(left_direction, right_direction)
             click_mouse(ear_left, ear_right)
             
         cv2.imshow("Gaze Detection", frame)

@@ -310,24 +310,26 @@ def click_mouse(ear_left: float, ear_right: float) -> None:
         ear_right: The EAR value for the right eye.
     """
     global MOUSE_LEFT_DOWN, MOUSE_RIGHT_DOWN, COUNTER_LEFT, COUNTER_RIGHT
+    print(f"EAR Left: {ear_left:.3f}, EAR Right: {ear_right:.3f}")
 
     if ear_left < EAR_THRESHOLD:
         COUNTER_LEFT += 1
     else:
         if COUNTER_LEFT >= CLICK_THRESHOLD:
-            # mouse_click(mouse_action.leftClickUp if MOUSE_LEFT_DOWN else mouse_action.leftClickDown)
+            mouse_click(mouse_action.LEFT_CLICK_DOWN)
+            mouse_click(mouse_action.LEFT_CLICK_UP)
             print("left click")
             MOUSE_LEFT_DOWN = not MOUSE_LEFT_DOWN
         COUNTER_LEFT = 0
 
-    if ear_right < EAR_THRESHOLD:
-        COUNTER_RIGHT += 1
-    else:
-        if COUNTER_RIGHT >= CLICK_THRESHOLD:
-            # mouse_click(mouse_action.rightClickUp if MOUSE_RIGHT_DOWN else mouse_action.rightClickDown)
-            print("right click")
-            MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
-        COUNTER_RIGHT = 0
+    # if ear_right < EAR_THRESHOLD:
+    #     COUNTER_RIGHT += 1
+    # else:
+    #     if COUNTER_RIGHT >= CLICK_THRESHOLD:
+    #         mouse_click(mouse_action.RIGHT_CLICK_UP if MOUSE_RIGHT_DOWN else mouse_action.RIGHT_CLICK_DOWN)
+    #         print("right click")
+    #         MOUSE_RIGHT_DOWN = not MOUSE_RIGHT_DOWN
+    #     COUNTER_RIGHT = 0
 
 def load_config() -> None:
     global SCALE, CLICK_THRESHOLD, EAR_THRESHOLD, UP_SCALAR, DOWN_SCALAR
@@ -380,8 +382,9 @@ def main() -> None:
 
             # Camera is mirrored so switch left and right
             ear_right, ear_left = eye_aspect_ratio(left_eye), eye_aspect_ratio(right_eye)
-            draw_pupils(frame, landmarks)
             click_mouse(ear_left, ear_right)
+            draw_pupils(frame, landmarks)
+            
             
         cv2.imshow("Gaze Detection", frame)
 

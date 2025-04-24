@@ -142,7 +142,6 @@ def eye_region(frame: npt.NDArray, landmarks: dlib.full_object_detection, left: 
 
     return thresh_eye, eye_points, x, y
 
-
 def detect_pupil(thresh_eye: np.ndarray) -> tuple[int, int, int]:
     """
     Detects the pupil in a given thresholded eye image.
@@ -238,7 +237,6 @@ def draw_pupils(frame: np.ndarray, landmarks: dlib.full_object_detection) -> Non
 
         draw_pupil(frame, thresh_eye.shape, pupil_position, x, y, is_left)
 
-
 def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[int, int, int], x: int, y: int, left=True)-> None:
     """
     Draws the detected pupil on the given frame and moves the mouse cursor accordingly.
@@ -292,6 +290,18 @@ def draw_pupil(frame: np.ndarray, shape: tuple[int, int], pupil_position: tuple[
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
 def eye_aspect_ratio(eye: np.ndarray) -> float:
+    """
+    Calculates the eye aspect ratio (EAR) for the given eye.
+
+    The EAR is calculated as the ratio of the distances between the eye's vertical
+    landmarks to the distance between the eye's horizontal landmarks.
+
+    Args:
+        eye: A numpy array of shape (6, 2) containing the x, y coordinates of the 6 eye landmarks.
+
+    Returns:
+        The eye aspect ratio (EAR) as a floating point number.
+    """
     a = np.linalg.norm(eye[1] - eye[5])
     b = np.linalg.norm(eye[2] - eye[4])
     c = np.linalg.norm(eye[0] - eye[3])
@@ -332,6 +342,22 @@ def click_mouse(ear_left: float, ear_right: float) -> None:
     #     COUNTER_RIGHT = 0
 
 def load_config() -> None:
+    """
+    Loads configuration settings from a JSON file.
+
+    This function reads the 'config.json' file and updates the global configuration variables:
+        - SCALE
+        - CLICK_THRESHOLD
+        - EAR_THRESHOLD
+        - UP_SCALAR
+        - DOWN_SCALAR
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     global SCALE, CLICK_THRESHOLD, EAR_THRESHOLD, UP_SCALAR, DOWN_SCALAR
     with open("config.json", "r") as f:
         config = json.load(f)
